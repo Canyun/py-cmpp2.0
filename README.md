@@ -4,7 +4,7 @@
 
 Forked From https://github.com/zhanghongchuang/py-cmpp2.0  
 在这个项目的基础上改了不少代码，支持发送超长短信，只测试过cmpp2.0  
-根据CMPP协议，只实现了以下消息的交互:
+根据[CMPP协议](https://www.kannel.org/~tolj/specs/CMPP2/CMPP-2.0.pdf), 只实现了以下消息的交互:
 
 | command_id | 说明 |
 |---|---|

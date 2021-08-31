@@ -9,6 +9,8 @@ setup(
     packages=find_namespace_packages(include=["pycmpp"]),
     install_requires=[
     ],
+    python_requires=">=3.7",
+    url="https://github.com/Canyun/py-cmpp2.0",
     include_package_data=True,
     license='GNU General Public License v3.0',
     author='Lee',

@@ -1,5 +1,24 @@
-# py-cmpp
-cmpp2.0
+# PyCmpp
 
-将原项目：https://github.com/KidoThunder/py-cmpp.git
-修改为支持cmpp2.0协议
+## 置顶
+
+Forked From https://github.com/zhanghongchuang/py-cmpp2.0  
+在这个项目的基础上改了不少代码，支持发送超长短信，只测试过cmpp2.0  
+根据CMPP协议，只实现了以下消息的交互:
+
+| command_id | 说明 |
+|---|---|
+| 0x00000001  | 请求连接  |
+| 0x80000001  | 请求连接应答  |
+| 0x00000002  | 终止连接  |
+| 0x80000002  | 终止连接应答  |
+| 0x00000004  | 提交短信  |
+| 0x80000004  | 提交短信应答  |
+| 0x00000008  | 激活测试  |
+| 0x80000008  | 激活测试应答  |
+
+## 安装方法
+
+```shell
+pip install pycmpp
+```

@@ -150,7 +150,12 @@ class Cmpp(object):
     def receive(self):
         while True:
             # 先接收12字节的消息头
-            header = self.so.recv(12)
+            try:
+                header = self.so.recv(12)
+            except Exception as e:
+                logger.error(f"连接错误，无法接收消息; error: {str(e)}")
+                time.sleep(10)
+                continue
             if header:
                 try:
                     msg_length, = Unpack.get_unsigned_long_data(header[0:4])
@@ -187,17 +192,18 @@ class Cmpp(object):
             try:
                 self.send(ActiveTestRequestInstance().create())
             except Exception as e:
-                logger.error(str(e))
+                logger.error(f"心跳包发送失败; error: {str(e)}")
                 if times >= TIMEOUT_CONNECT_TIMES:
                     times = 0
                     self.reconnect()
                     logger.debug('重新连接服务器')
             finally:
                 times += 1
-                time.sleep(60)
+                time.sleep(3)
 
     def reconnect(self):
         self.close()
+        self.so = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect()
         self.auth()
 

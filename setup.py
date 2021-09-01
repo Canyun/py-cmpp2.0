@@ -1,6 +1,6 @@
 from setuptools import setup, find_namespace_packages
 
-version = '2.0.1'
+version = '2.0.2'
 name = 'pycmpp'
 
 setup(

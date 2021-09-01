@@ -1,5 +1,5 @@
 from pycmpp.cmpp_defines import *
-from pycmpp.utils import Unpack, Pack
+from pycmpp.utils import Unpack, Pack, decode_headers
 
 
 class ResponseInstance(object):
@@ -7,6 +7,9 @@ class ResponseInstance(object):
     command_id = 0
     seq_id = -1
     raw_message_body = b''
+
+    def decode_headers(self, header):
+        self.length, self.command_id, self.seq_id = decode_headers(header)
 
     def resolve(self, response_message):
         """
@@ -31,6 +34,7 @@ class ConnectResponseInstance(ResponseInstance):
     version = None
 
     def resolve(self, response_message):
+        self.decode_headers(response_message[0: 12])
         message_body = response_message[12:]
         self.status, = Unpack.get_unsigned_char_data(message_body[0:1])
         self.authenticator_ISMG = message_body[1:17]
@@ -53,6 +57,7 @@ class SubmitResponseInstance(ResponseInstance):
     status = -1
 
     def resolve(self, response_message):
+        self.decode_headers(response_message[0: 12])
         message_body = response_message[12:]
         self.msg_id, = Unpack.get_unsigned_long_long_data(message_body[0:8])
         self.status, = Unpack.get_unsigned_char_data(message_body[8:9])

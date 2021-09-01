@@ -1,4 +1,5 @@
 import logging
+import random
 import socket
 import threading
 import time
@@ -27,7 +28,8 @@ class Cmpp(object):
                  sp_secret: str,
                  src_id: str,
                  delivery: str = 0,
-                 client_heartbeat=True):
+                 client_heartbeat=True,
+                 long_message_interval=0):
         """
         :param host: Gateway IP
         :param port: Gateway port
@@ -44,9 +46,13 @@ class Cmpp(object):
         self.src_id = src_id
         self.delivery = delivery
         self.client_heartbeat = client_heartbeat
+        self.long_message_interval = long_message_interval
         self.so = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._thread_receive = None
         self._thread_heartbeat = None
+        self.msg_flag_list = list(range(0, 256))
+        # 随机打乱顺序
+        random.shuffle(self.msg_flag_list)
         self.send_queue = Queue(maxsize=999)
         self.handlers = self.load_handlers()
 
@@ -58,13 +64,20 @@ class Cmpp(object):
             _handlers[handler_cls.command_id] = handler_cls
         return _handlers
 
+    def get_msg_flag(self):
+        number = self.msg_flag_list.pop()
+        self.msg_flag_list.insert(0, number)
+        return number
+
     def submit(self, content, phone_list):
         """
+        发送短信方法，此方法线程不安全
+
         超长短信需要携带6个字节的协议头 05 00 03 XX MM NN；这6个字节占用短信内容长度；
         byte 1 : 05, 表示剩余协议头的长度
         byte 2 : 00, 这个值在GSM 03.40规范9.2.3.24.1中规定，表示随后的这批超长短信的标识位长度为1（格式中的XX值）。
         byte 3 : 03, 这个值表示剩下短信标识的长度
-        byte 4 : XX，这批短信的唯一标志，事实上，SME(手机或者SP)把消息合并完之后，就重新记录，所以这个标志是否唯一并不是很重要。
+        byte 4 : XX，这批短信的唯一标志，这个标志会影响手机合并短信
         byte 5 : MM, 这批短信的数量。如果一个超长短信总共5条，这里的值就是5。
         byte 6 : NN, 这批短信的数量。如果当前短信是这批短信中的第一条的值是1，第二条的值是2。
 
@@ -80,16 +93,17 @@ class Cmpp(object):
                 dest_terminal_id=phone_list,
                 registered_delivery=self.delivery
             )
-            logger.info(f'发送短信; msg: {msg}')
+            logger.info(f'发送短信; seq_id: {req.seq_id}; msg: {msg}')
             self.send(msg)
         else:
             messages = split_message(content)
+            msg_flag = self.get_msg_flag()
             for i, message in enumerate(messages):
                 message_head = (
                         Pack.get_unsigned_char_data(5) +
                         Pack.get_unsigned_char_data(0) +
                         Pack.get_unsigned_char_data(3) +
-                        Pack.get_unsigned_char_data(0) +
+                        Pack.get_unsigned_char_data(msg_flag) +
                         Pack.get_unsigned_char_data(len(messages)) +
                         Pack.get_unsigned_char_data(i + 1)
                 )
@@ -106,8 +120,11 @@ class Cmpp(object):
                     tp_pid=1,
                     tp_udhi=1
                 )
-                logger.info(f'发送超长短信; total: {len(messages)}; number: {i}; msg: {msg}')
+                logger.info(f'发送超长短信; seq_id: {req.seq_id}; total: {len(messages)}; number: {i + 1}; msg: {msg}')
                 self.send(msg)
+
+            if self.long_message_interval > 0:
+                time.sleep(self.long_message_interval)
 
     # def send_message(self):
     #     while True:

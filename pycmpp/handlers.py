@@ -72,7 +72,7 @@ class CmppSubmitRespHandler(BaseHandler):
         resp = SubmitResponseInstance()
         resp.resolve(self.message)
         if resp.status == 0:
-            logger.info(f'发送成功; msg_id: {resp.msg_id}')
+            logger.info(f'发送成功; seq_id: {resp.seq_id}; ;msg_id: {resp.msg_id}')
         else:
             error = self.error_map.get(resp.status, '其它错误')
-            logger.info(f'发送失败; msg_id: {resp.msg_id}; error: {error}')
+            logger.info(f'发送失败; seq_id: {resp.seq_id}; msg_id: {resp.msg_id}; error: {error}')

@@ -1,6 +1,5 @@
-from pycmpp import utils
 from pycmpp.cmpp_defines import *
-from pycmpp.utils import Pack, decode_headers
+from pycmpp.utils import *
 
 _global_sep_no = 1
 
@@ -11,10 +10,12 @@ class RequestInstance(object):
     seq_id = -1
 
     def get_headers(self, body_length=0):
+        self.length = body_length + 12
+        self.seq_id = get_sequence_no()
         return (
-                Pack.get_unsigned_long_data(body_length + 12) +
+                Pack.get_unsigned_long_data(self.length) +
                 Pack.get_unsigned_long_data(self.command_id) +
-                Pack.get_unsigned_long_data(utils.get_sequence_no())
+                Pack.get_unsigned_long_data(self.seq_id)
         )
 
     def resolve(self, request_message):
@@ -28,9 +29,6 @@ class RequestInstance(object):
     def create(self, *args, **kwargs):
         """
         生成请求
-        :param sp_id:
-        :param sp_secret:
-        :param message:
         :return:
         """
         raise NotImplementedError()
@@ -47,8 +45,8 @@ class ConnectRequestInstance(RequestInstance):
         _version = Pack.get_unsigned_char_data(CMPP_VERSION)
         _sp_id = sp_id.encode('utf-8')
         _sp_secret = sp_secret.encode("utf-8")
-        _time_str = utils.get_string_time()
-        self.auth_source = utils.get_md5_digest(
+        _time_str = get_string_time()
+        self.auth_source = get_md5_digest(
             _sp_id + 9 * b'\x00' + _sp_secret + _time_str.encode("utf-8")
         )
         message_body = _sp_id + self.auth_source + _version + Pack.get_unsigned_long_data(int(_time_str))
@@ -139,7 +137,71 @@ class SubmitRequestInstance(RequestInstance):
         return self.get_headers(len(_message_body)) + _message_body
 
     def resolve(self, request_message):
-        pass
+        self.length, self.command_id, self.seq_id = decode_headers(request_message)
+        message_body = request_message[12:]
+        msg_id, = Unpack.get_unsigned_long_long_data(message_body[0:8])
+        pk_total, = Unpack.get_unsigned_char_data(message_body[8:9])
+        pk_number, = Unpack.get_unsigned_char_data(message_body[9:10])
+        register_delivery, = Unpack.get_unsigned_char_data(message_body[10:11])
+        msg_level, = Unpack.get_unsigned_char_data(message_body[11:12])
+        service_id = message_body[12:22].decode('utf-8')
+        fee_usertype, = Unpack.get_unsigned_char_data(message_body[22:23])
+        fee_terminal_id = message_body[23: 44].decode('utf-8')
+        tp_pid, = Unpack.get_unsigned_char_data(message_body[44:45])
+        tp_udhi, = Unpack.get_unsigned_char_data(message_body[45:46])
+        msg_fmt, = Unpack.get_unsigned_char_data(message_body[46:47])
+        msg_src = message_body[47: 53].decode('utf-8')
+        fee_type = message_body[53: 55].decode('utf-8')
+        fee_code = message_body[55: 61].decode('utf-8')
+        valid_time = message_body[61: 78].decode('utf-8')
+        at_time = message_body[78: 95].decode('utf-8')
+        src_id = message_body[95: 116].decode('utf-8')
+        destusr_tl, = Unpack.get_unsigned_char_data(message_body[116:117])
+        cur = 117 + 21 * destusr_tl
+        dest_terminal_id = message_body[117: cur].decode('utf-8')
+        msg_length, = Unpack.get_unsigned_char_data(message_body[cur: cur + 1])
+        cur += 1
+
+        if tp_udhi == 1:
+            _tmp = message_body[cur: cur + msg_length]
+            msg_head = _tmp[0:6].decode('latin-1')
+            msg_content = _tmp[6:].decode('utf-16-be')
+        else:
+            msg_head = None
+            msg_content = message_body[cur: cur + msg_length].decode('utf-16-be')
+        cur = cur + msg_length
+        reserve = message_body[cur:].decode('utf-8')
+
+        result = {
+            'length': self.length,
+            'command_id': self.command_id,
+            'seq_id': self.seq_id,
+            'msg_id': msg_id,
+            'pk_total': pk_total,
+            'pk_number': pk_number,
+            'register_delivery': register_delivery,
+            'msg_level': msg_level,
+            'service_id': service_id,
+            'fee_usertype': fee_usertype,
+            'fee_terminal_id': fee_terminal_id,
+            'tp_pid': tp_pid,
+            'tp_udhi': tp_udhi,
+            'msg_fmt': msg_fmt,
+            'msg_src': msg_src,
+            'fee_type': fee_type,
+            'fee_code': fee_code,
+            'valid_time': valid_time,
+            'at_time': at_time,
+            'src_id': src_id,
+            'destusr_tl': destusr_tl,
+            'dest_terminal_id': dest_terminal_id,
+            'msg_length': msg_length,
+            'msg_head': msg_head,
+            'msg_content': msg_content,
+            'reserve': reserve
+        }
+
+        return result
 
 
 class ActiveTestRequestInstance(RequestInstance):
